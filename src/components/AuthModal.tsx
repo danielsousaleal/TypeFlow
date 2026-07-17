@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { LogIn, X } from "lucide-react";
+import { ArrowRight, LockKeyhole, UserRound, X } from "lucide-react";
 import type { User } from "@/lib/types";
 
 type AuthModalProps = {
@@ -51,22 +51,36 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-3xl border-2 border-[#5E503F] bg-[#22333B] p-8 shadow-2xl">
-        <div className="mb-6 flex items-start justify-between gap-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="auth-title"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div className="fade-up w-full max-w-md rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-2xl shadow-black/40 sm:p-8">
+        <div className="mb-7 flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-[#A9927D]">
-              Entrar no placar
+            <span className="mb-3 inline-flex rounded-lg bg-[var(--accent)]/10 p-2 text-[var(--accent)]">
+              <UserRound size={20} />
+            </span>
+            <h2
+              id="auth-title"
+              className="text-xl font-semibold tracking-tight text-[var(--foreground)]"
+            >
+              Salve seus resultados
             </h2>
-            <p className="mt-2 text-sm text-[#A9927D]/80">
-              Nick novo cria conta automaticamente. Se o nick já existir,
-              usamos a senha cadastrada.
+            <p className="mt-2 max-w-sm text-sm leading-relaxed text-[var(--muted)]">
+              Um nick novo cria sua conta. Se ele já existir, basta usar a
+              mesma senha.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-[#5E503F] bg-[#323E40] p-2 text-[#A9927D] transition hover:bg-[#3d4b4d]"
+            className="rounded-lg p-2 text-[var(--muted)] transition hover:bg-white/5 hover:text-[var(--foreground)]"
             aria-label="Fechar"
           >
             <X size={18} />
@@ -75,36 +89,49 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold uppercase tracking-wider text-[#A9927D]/80">
+            <label className="text-xs font-semibold uppercase tracking-widest text-[var(--muted)]">
               Nick
             </label>
-            <input
-              value={nick}
-              onChange={(e) => setNick(e.target.value)}
-              className="rounded-lg border border-[#5E503F] bg-[#323E40] p-3 text-[#A9927D] outline-none ring-[#A9927D] focus:ring-2"
-              placeholder="ex: daniel_dev"
-              autoComplete="username"
-              required
-            />
+            <div className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 transition focus-within:border-[var(--accent)]/60">
+              <UserRound size={17} className="shrink-0 text-[var(--muted)]" />
+              <input
+                value={nick}
+                onChange={(e) => setNick(e.target.value)}
+                className="min-w-0 flex-1 bg-transparent py-3 text-sm text-[var(--foreground)] outline-none placeholder:text-[var(--muted)]/60"
+                placeholder="seu_nick"
+                autoComplete="username"
+                autoFocus
+                required
+              />
+            </div>
           </div>
 
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold uppercase tracking-wider text-[#A9927D]/80">
+            <label className="text-xs font-semibold uppercase tracking-widest text-[var(--muted)]">
               Senha
             </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="rounded-lg border border-[#5E503F] bg-[#323E40] p-3 text-[#A9927D] outline-none ring-[#A9927D] focus:ring-2"
-              placeholder="qualquer senha (mín. 4)"
-              autoComplete="current-password"
-              required
-            />
+            <div className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 transition focus-within:border-[var(--accent)]/60">
+              <LockKeyhole
+                size={17}
+                className="shrink-0 text-[var(--muted)]"
+              />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="min-w-0 flex-1 bg-transparent py-3 text-sm text-[var(--foreground)] outline-none placeholder:text-[var(--muted)]/60"
+                placeholder="mínimo de 4 caracteres"
+                autoComplete="current-password"
+                required
+              />
+            </div>
           </div>
 
           {error && (
-            <p className="rounded-lg border border-red-900/50 bg-red-950/40 px-3 py-2 text-sm text-red-300">
+            <p
+              className="rounded-lg border border-red-400/20 bg-red-400/10 px-3 py-2 text-sm text-red-300"
+              role="alert"
+            >
               {error}
             </p>
           )}
@@ -112,10 +139,10 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
           <button
             type="submit"
             disabled={loading}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#A9927D] px-6 py-3 font-bold text-[#121619] transition hover:bg-[#8e7a68] disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-6 py-3 text-sm font-semibold text-[#17140a] transition hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <LogIn size={18} />
-            {loading ? "Entrando..." : "Entrar / Criar conta"}
+            {loading ? "Entrando..." : "Continuar"}
+            {!loading && <ArrowRight size={17} />}
           </button>
         </form>
       </div>

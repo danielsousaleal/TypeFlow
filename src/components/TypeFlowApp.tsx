@@ -8,13 +8,19 @@ import {
   type KeyboardEvent,
 } from "react";
 import {
-  AlertCircle,
+  ArrowDown,
+  CircleX,
+  Keyboard,
+  LoaderCircle,
   LogOut,
-  Play,
   RefreshCw,
+  RotateCcw,
+  Save,
+  Target,
+  Timer,
   Trophy,
-  Type,
   UserRound,
+  Zap,
 } from "lucide-react";
 import { AuthModal } from "@/components/AuthModal";
 import { Leaderboard } from "@/components/Leaderboard";
@@ -26,6 +32,23 @@ import type {
   TextLength,
   User,
 } from "@/lib/types";
+
+const MODE_OPTIONS: Array<{ value: GameMode; label: string }> = [
+  { value: "normal", label: "normal" },
+  { value: "sem_acentos", label: "sem acentos" },
+];
+
+const LENGTH_OPTIONS: Array<{ value: TextLength; label: string }> = [
+  { value: "curto", label: "curto" },
+  { value: "médio", label: "médio" },
+  { value: "longo", label: "longo" },
+];
+
+const DIFFICULTY_OPTIONS: Array<{ value: Difficulty; label: string }> = [
+  { value: "fáceis", label: "fácil" },
+  { value: "dia a dia", label: "cotidiano" },
+  { value: "difíceis", label: "difícil" },
+];
 
 export default function TypeFlowApp() {
   const [status, setStatus] = useState<GameStatus>("idle");
@@ -49,6 +72,7 @@ export default function TypeFlowApp() {
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [savingScore, setSavingScore] = useState(false);
   const [pendingSaveAfterAuth, setPendingSaveAfterAuth] = useState(false);
+  const [now, setNow] = useState(0);
 
   const typingAreaRef = useRef<HTMLDivElement>(null);
   const errorCountRef = useRef(0);
@@ -140,8 +164,10 @@ export default function TypeFlowApp() {
       .then((data: { user?: User | null }) => setUser(data.user ?? null))
       .catch(() => setUser(null));
 
-    void loadScores();
-    void fetchText();
+    queueMicrotask(() => {
+      void loadScores();
+      void fetchText();
+    });
     // Carga inicial apenas — mudanças de config pedem "Novo Teste"
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -150,6 +176,13 @@ export default function TypeFlowApp() {
     if (status === "ready" && typingAreaRef.current) {
       typingAreaRef.current.focus();
     }
+  }, [status]);
+
+  useEffect(() => {
+    if (status !== "typing") return;
+
+    const interval = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(interval);
   }, [status]);
 
   const finishTest = useCallback(
@@ -190,6 +223,7 @@ export default function TypeFlowApp() {
         const now = Date.now();
         setStatus("typing");
         setStartTime(now);
+        setNow(now);
         startTimeRef.current = now;
       }
 
@@ -276,13 +310,13 @@ export default function TypeFlowApp() {
 
   function renderText() {
     return textToType.split("").map((char, index) => {
-      let charClass = "text-gray-500 transition-colors duration-100";
+      let charClass = "text-[var(--muted)]/55 transition-colors duration-75";
 
       if (index < typedText.length) {
         charClass =
           typedText[index] === char
-            ? "text-[#A9927D]"
-            : "rounded-sm bg-red-900/40 text-red-400";
+            ? "text-[var(--foreground)]"
+            : "rounded-sm bg-red-400/15 text-[var(--danger)]";
       }
 
       const isCursor = index === typedText.length && status !== "finished";
@@ -290,7 +324,7 @@ export default function TypeFlowApp() {
       return (
         <span key={index} className="relative">
           {isCursor && (
-            <span className="absolute top-0 left-0 h-full w-[2px] animate-pulse bg-[#A9927D]" />
+            <span className="absolute top-[8%] left-0 h-[84%] w-[2px] animate-pulse rounded-full bg-[var(--accent)]" />
           )}
           <span className={charClass}>{char}</span>
         </span>
@@ -298,259 +332,366 @@ export default function TypeFlowApp() {
     });
   }
 
-  return (
-    <div className="flex min-h-screen flex-col items-center bg-[#121619] px-4 py-10 font-sans text-[#A9927D] selection:bg-[#323E40] selection:text-[#A9927D]">
-      <header className="mb-8 flex w-full max-w-5xl flex-col items-center justify-between gap-4 md:flex-row">
-        <div className="flex items-center gap-3">
-          <div className="rounded-xl border border-[#5E503F] bg-[#22333B] p-3 shadow-lg">
-            <Type size={28} className="text-[#A9927D]" />
-          </div>
-          <div>
-            <h1 className="text-4xl font-bold tracking-tight">TypeFlow</h1>
-            <p className="text-sm text-[#A9927D]/70">
-              Treino de digitação com IA + placar opcional
-            </p>
-          </div>
-        </div>
+  const elapsedMs = startTime
+    ? Math.max(
+        0,
+        (status === "typing" ? now : (endTime ?? now)) - startTime,
+      )
+    : 0;
+  const liveWpm =
+    elapsedMs > 0
+      ? Math.round(typedText.length / 5 / (elapsedMs / 60_000))
+      : 0;
+  const currentCorrect = typedText
+    .split("")
+    .reduce(
+      (total, char, index) => total + (char === textToType[index] ? 1 : 0),
+      0,
+    );
+  const liveAccuracy =
+    typedText.length > 0
+      ? Math.round((currentCorrect / typedText.length) * 100)
+      : 100;
+  const progress =
+    textToType.length > 0
+      ? Math.min(100, (typedText.length / textToType.length) * 100)
+      : 0;
 
-        <div className="flex flex-wrap items-center gap-3">
-          {status === "typing" && (
-            <span className="flex items-center gap-2 rounded-lg border border-[#5E503F] bg-[#22333B] px-4 py-2">
-              <RefreshCw size={18} className="animate-spin" />
-              Em progresso...
-            </span>
-          )}
+  return (
+    <div className="app-glow min-h-screen text-[var(--foreground)]">
+      <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-6 sm:px-6 sm:py-8">
+        <a
+          href="#teste"
+          className="group flex items-center gap-2.5"
+          aria-label="TypeFlow — voltar ao teste"
+        >
+          <span className="text-[var(--accent)] transition group-hover:rotate-[-4deg]">
+            <Keyboard size={28} strokeWidth={2.2} />
+          </span>
+          <span className="text-xl font-semibold tracking-[-0.04em]">
+            type<span className="text-[var(--accent)]">flow</span>
+          </span>
+        </a>
+
+        <div className="flex items-center gap-2 sm:gap-4">
+          <a
+            href="#ranking"
+            className="hidden items-center gap-2 text-sm text-[var(--muted)] transition hover:text-[var(--foreground)] sm:flex"
+          >
+            <Trophy size={15} />
+            ranking
+          </a>
 
           {user ? (
-            <div className="flex items-center gap-2 rounded-lg border border-[#5E503F] bg-[#22333B] px-3 py-2">
-              <UserRound size={18} />
-              <span className="font-semibold">{user.nick}</span>
+            <div className="flex items-center gap-1 rounded-lg bg-[var(--surface)] p-1 pl-3">
+              <span className="max-w-28 truncate text-sm font-medium">
+                {user.nick}
+              </span>
               <button
                 type="button"
                 onClick={() => void handleLogout()}
-                className="ml-1 rounded-md border border-[#5E503F] bg-[#323E40] p-1.5 transition hover:bg-[#3d4b4d]"
+                className="rounded-md p-2 text-[var(--muted)] transition hover:bg-white/5 hover:text-[var(--foreground)]"
+                aria-label="Sair da conta"
                 title="Sair"
               >
-                <LogOut size={14} />
+                <LogOut size={15} />
               </button>
             </div>
           ) : (
             <button
               type="button"
               onClick={() => setAuthOpen(true)}
-              className="flex items-center gap-2 rounded-lg border border-[#5E503F] bg-[#22333B] px-4 py-2 font-semibold transition hover:bg-[#2c414a]"
+              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--muted)] transition hover:bg-[var(--surface)] hover:text-[var(--foreground)]"
             >
-              <UserRound size={18} />
-              Entrar no placar
+              <UserRound size={16} />
+              <span className="hidden sm:inline">entrar</span>
             </button>
           )}
         </div>
       </header>
 
-      <section className="mb-8 flex w-full max-w-5xl flex-wrap items-end justify-between gap-6 rounded-2xl border border-[#5E503F] bg-[#22333B] p-6 shadow-2xl">
-        <div className="flex flex-grow flex-wrap gap-6">
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold tracking-wider uppercase text-[#A9927D]/80">
-              Modalidade
-            </label>
-            <select
-              className="min-w-[140px] cursor-pointer rounded-lg border border-[#5E503F] bg-[#323E40] p-3 text-[#A9927D] outline-none ring-[#A9927D] transition-all focus:ring-2 disabled:opacity-50"
-              value={mode}
-              onChange={(e) => setMode(e.target.value as GameMode)}
-              disabled={status === "loading" || status === "typing"}
-            >
-              <option value="normal">Normal (Com acentos)</option>
-              <option value="sem_acentos">Sem Acentos / Pontuação</option>
-            </select>
-          </div>
+      <main className="mx-auto w-full max-w-6xl px-4 sm:px-6">
+        <section id="teste" className="scroll-mt-8 pt-6 sm:pt-12">
+          <div className="mx-auto flex max-w-4xl flex-col gap-8">
+            <div className="flex flex-col items-center justify-between gap-3 rounded-xl bg-[var(--surface)] p-2 lg:flex-row">
+              <div className="flex w-full flex-wrap items-center justify-center gap-1 lg:w-auto lg:justify-start">
+                <span className="hidden px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)] sm:inline">
+                  modo
+                </span>
+                {MODE_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setMode(option.value)}
+                    disabled={status === "loading" || status === "typing"}
+                    className={`rounded-lg px-3 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                      mode === option.value
+                        ? "bg-[var(--surface-raised)] text-[var(--accent)] shadow-sm"
+                        : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
 
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold tracking-wider uppercase text-[#A9927D]/80">
-              Tamanho
-            </label>
-            <select
-              className="min-w-[140px] cursor-pointer rounded-lg border border-[#5E503F] bg-[#323E40] p-3 text-[#A9927D] outline-none ring-[#A9927D] transition-all focus:ring-2 disabled:opacity-50"
-              value={length}
-              onChange={(e) => setLength(e.target.value as TextLength)}
-              disabled={status === "loading" || status === "typing"}
-            >
-              <option value="curto">Curto (~20 pal.)</option>
-              <option value="médio">Médio (~50 pal.)</option>
-              <option value="longo">Longo (~100 pal.)</option>
-            </select>
-          </div>
+                <span className="mx-1 h-5 w-px bg-[var(--border)]" />
 
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold tracking-wider uppercase text-[#A9927D]/80">
-              Dificuldade
-            </label>
-            <select
-              className="min-w-[140px] cursor-pointer rounded-lg border border-[#5E503F] bg-[#323E40] p-3 text-[#A9927D] outline-none ring-[#A9927D] transition-all focus:ring-2 disabled:opacity-50"
-              value={difficulty}
-              onChange={(e) => setDifficulty(e.target.value as Difficulty)}
-              disabled={status === "loading" || status === "typing"}
-            >
-              <option value="fáceis">Fáceis</option>
-              <option value="dia a dia">Dia a Dia</option>
-              <option value="difíceis">Difíceis</option>
-            </select>
-          </div>
-        </div>
+                {LENGTH_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setLength(option.value)}
+                    disabled={status === "loading" || status === "typing"}
+                    className={`rounded-lg px-3 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                      length === option.value
+                        ? "bg-[var(--surface-raised)] text-[var(--accent)] shadow-sm"
+                        : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
 
-        <button
-          type="button"
-          onClick={() => void fetchText()}
-          disabled={status === "loading"}
-          className="flex items-center gap-2 rounded-lg bg-[#A9927D] px-6 py-3 font-bold text-[#121619] transition-all hover:scale-105 hover:bg-[#8e7a68] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {status === "loading" ? (
-            <>
-              <RefreshCw size={20} className="animate-spin" /> Gerando...
-            </>
-          ) : (
-            <>
-              <Play size={20} /> Novo Teste
-            </>
-          )}
-        </button>
-      </section>
+                <span className="mx-1 hidden h-5 w-px bg-[var(--border)] sm:block" />
 
-      <section className="relative mb-12 w-full max-w-5xl">
-        {status === "loading" ? (
-          <div className="flex h-64 items-center justify-center rounded-2xl border border-[#5E503F] bg-[#22333B] shadow-xl">
-            <div className="flex animate-pulse flex-col items-center gap-4">
-              <RefreshCw size={40} className="animate-spin text-[#A9927D]" />
-              <p className="text-lg">
-                A Inteligência Artificial está escrevendo seu texto...
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div
-            ref={typingAreaRef}
-            tabIndex={0}
-            onKeyDown={handleKeyDown}
-            className="min-h-[250px] w-full cursor-text rounded-2xl border border-[#5E503F] bg-[#22333B] p-8 shadow-2xl transition-all outline-none focus:ring-2 focus:ring-[#A9927D] focus:ring-offset-4 focus:ring-offset-[#121619]"
-          >
-            {(status === "idle" || status === "ready") && (
-              <div className="absolute top-4 right-4 flex items-center gap-2 rounded-full border border-[#5E503F] bg-[#323E40] px-3 py-1 text-xs text-[#A9927D]/70">
-                <AlertCircle size={14} />
-                Comece a digitar para iniciar o cronômetro
+                {DIFFICULTY_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setDifficulty(option.value)}
+                    disabled={status === "loading" || status === "typing"}
+                    className={`rounded-lg px-3 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                      difficulty === option.value
+                        ? "bg-[var(--surface-raised)] text-[var(--accent)] shadow-sm"
+                        : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
               </div>
-            )}
-
-            <div
-              className="font-mono text-2xl leading-relaxed select-none md:text-3xl"
-              style={{ wordBreak: "break-word" }}
-            >
-              {renderText()}
-            </div>
-          </div>
-        )}
-      </section>
-
-      <div className="mb-10 w-full max-w-5xl">
-        <Leaderboard
-          scores={scores}
-          loading={scoresLoading}
-          currentNick={user?.nick}
-        />
-      </div>
-
-      {status === "finished" && startTime && endTime && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-2xl rounded-3xl border-2 border-[#5E503F] bg-[#22333B] p-8 shadow-2xl md:p-12">
-            <div className="mb-10 text-center">
-              <div className="mb-4 inline-flex items-center justify-center rounded-full border border-[#5E503F] bg-[#323E40] p-4">
-                <Trophy size={48} className="text-[#A9927D]" />
-              </div>
-              <h2 className="text-4xl font-bold">Teste Concluído!</h2>
-              <p className="mt-2 text-[#A9927D]/80">
-                Aqui estão seus resultados da rodada.
-              </p>
-            </div>
-
-            <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
-              <div className="rounded-xl border border-[#5E503F] bg-[#323E40] p-4 text-center">
-                <p className="mb-1 text-sm tracking-wider uppercase opacity-70">
-                  Velocidade
-                </p>
-                <p className="text-4xl font-bold">
-                  {wpm} <span className="text-lg font-normal">PPM</span>
-                </p>
-              </div>
-              <div className="rounded-xl border border-[#5E503F] bg-[#323E40] p-4 text-center">
-                <p className="mb-1 text-sm tracking-wider uppercase opacity-70">
-                  Precisão
-                </p>
-                <p className="text-4xl font-bold">
-                  {accuracy}
-                  <span className="text-lg font-normal">%</span>
-                </p>
-              </div>
-              <div className="rounded-xl border border-[#5E503F] bg-[#323E40] p-4 text-center">
-                <p className="mb-1 text-sm tracking-wider uppercase opacity-70">
-                  Tempo
-                </p>
-                <p className="text-4xl font-bold">
-                  {((endTime - startTime) / 1000).toFixed(1)}
-                  <span className="text-lg font-normal">s</span>
-                </p>
-              </div>
-              <div className="rounded-xl border border-[#5E503F] bg-[#323E40] p-4 text-center">
-                <p className="mb-1 text-sm tracking-wider uppercase opacity-70">
-                  Erros
-                </p>
-                <p className="text-4xl font-bold text-red-400">{errorCount}</p>
-              </div>
-            </div>
-
-            {saveMessage && (
-              <p className="mb-4 rounded-lg border border-[#5E503F] bg-[#323E40] px-4 py-3 text-center text-sm">
-                {saveMessage}
-              </p>
-            )}
-
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <button
-                type="button"
-                onClick={() => void handleSaveScore()}
-                disabled={savingScore}
-                className="flex flex-1 items-center justify-center gap-3 rounded-xl border border-[#5E503F] bg-[#323E40] px-6 py-4 text-lg font-bold transition hover:bg-[#3d4b4d] disabled:opacity-50"
-              >
-                <Trophy size={22} />
-                {user
-                  ? savingScore
-                    ? "Salvando..."
-                    : "Salvar no placar"
-                  : "Entrar e salvar"}
-              </button>
 
               <button
                 type="button"
                 onClick={() => void fetchText()}
-                className="flex flex-1 items-center justify-center gap-3 rounded-xl bg-[#A9927D] px-6 py-4 text-lg font-bold text-[#121619] transition hover:scale-[1.02] hover:bg-[#8e7a68] active:scale-[0.98]"
+                disabled={status === "loading"}
+                className="flex w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-[var(--surface-raised)] px-3 py-2 text-xs font-medium text-[var(--muted)] transition hover:text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-50 lg:w-auto"
               >
-                <RefreshCw size={22} />
-                Tentar Novamente
+                <RefreshCw
+                  size={14}
+                  className={status === "loading" ? "animate-spin" : ""}
+                />
+                novo texto
               </button>
             </div>
-          </div>
-        </div>
-      )}
 
-      <footer className="mt-auto pt-8 pb-4 text-center text-sm opacity-50">
-        <p>
-          Clique na área de texto e comece a digitar. O timer inicia na primeira
-          tecla.
-        </p>
-        <p className="mt-1">
-          Pressione{" "}
-          <kbd className="rounded border border-[#5E503F] bg-[#323E40] px-2 py-1">
-            Backspace
-          </kbd>{" "}
-          para corrigir erros.
-        </p>
+            <div className="min-h-10">
+              {status === "typing" ? (
+                <div className="fade-up flex items-end gap-6 font-mono">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-[var(--muted)]">
+                      ppm
+                    </p>
+                    <p className="text-2xl text-[var(--accent)]">{liveWpm}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-[var(--muted)]">
+                      precisão
+                    </p>
+                    <p className="text-lg text-[var(--foreground)]">
+                      {liveAccuracy}%
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-[var(--muted)]">
+                      tempo
+                    </p>
+                    <p className="text-lg text-[var(--foreground)]">
+                      {(elapsedMs / 1000).toFixed(1)}s
+                    </p>
+                  </div>
+                </div>
+              ) : status === "ready" ? (
+                <p className="flex items-center gap-2 text-sm text-[var(--muted)]">
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--accent)]" />
+                  pronto — comece a digitar
+                </p>
+              ) : null}
+            </div>
+
+            <div className="relative">
+              <div className="absolute inset-x-0 top-0 h-px overflow-hidden rounded-full bg-[var(--border)]">
+                <div
+                  className="h-full bg-[var(--accent)] transition-[width] duration-150"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+
+              {status === "loading" ? (
+                <div className="flex min-h-[310px] flex-col items-center justify-center gap-3 text-[var(--muted)]">
+                  <LoaderCircle
+                    size={24}
+                    className="animate-spin text-[var(--accent)]"
+                  />
+                  <p className="text-sm">criando um texto para você...</p>
+                </div>
+              ) : status === "finished" && startTime && endTime ? (
+                <div className="fade-up py-10">
+                  <div className="mb-10 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+                    <div>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent)]">
+                        teste concluído
+                      </p>
+                      <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+                        Bom ritmo.
+                      </h2>
+                    </div>
+                    <p
+                      className={`text-sm ${
+                        accuracy >= 85
+                          ? "text-emerald-400"
+                          : "text-[var(--muted)]"
+                      }`}
+                    >
+                      {accuracy >= 85
+                        ? "resultado elegível para o ranking"
+                        : "alcance 85% para entrar no ranking"}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--border)] sm:grid-cols-4">
+                    {[
+                      {
+                        label: "ppm",
+                        value: wpm,
+                        icon: <Zap size={15} />,
+                        accent: true,
+                      },
+                      {
+                        label: "precisão",
+                        value: `${accuracy}%`,
+                        icon: <Target size={15} />,
+                      },
+                      {
+                        label: "tempo",
+                        value: `${((endTime - startTime) / 1000).toFixed(1)}s`,
+                        icon: <Timer size={15} />,
+                      },
+                      {
+                        label: "erros",
+                        value: errorCount,
+                        icon: <CircleX size={15} />,
+                      },
+                    ].map((stat) => (
+                      <div
+                        key={stat.label}
+                        className="bg-[var(--surface)] px-5 py-6"
+                      >
+                        <p className="mb-3 flex items-center gap-2 text-xs text-[var(--muted)]">
+                          {stat.icon}
+                          {stat.label}
+                        </p>
+                        <p
+                          className={`font-mono text-3xl ${
+                            stat.accent
+                              ? "text-[var(--accent)]"
+                              : "text-[var(--foreground)]"
+                          }`}
+                        >
+                          {stat.value}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {saveMessage && (
+                    <p
+                      className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-center text-sm text-[var(--muted)]"
+                      role="status"
+                    >
+                      {saveMessage}
+                    </p>
+                  )}
+
+                  <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={() => void fetchText()}
+                      className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-[#17140a] transition hover:brightness-110 active:scale-[0.99]"
+                    >
+                      <RotateCcw size={16} />
+                      jogar novamente
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleSaveScore()}
+                      disabled={savingScore || accuracy < 85}
+                      className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-5 py-3 text-sm font-semibold text-[var(--foreground)] transition hover:bg-[var(--surface-raised)] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Save size={16} />
+                      {user
+                        ? savingScore
+                          ? "salvando..."
+                          : "salvar resultado"
+                        : "entrar e salvar"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  ref={typingAreaRef}
+                  tabIndex={0}
+                  onKeyDown={handleKeyDown}
+                  onClick={() => typingAreaRef.current?.focus()}
+                  className="flex min-h-[310px] cursor-text items-center py-10 outline-none"
+                  aria-label="Área de digitação"
+                >
+                  <div
+                    className="w-full font-mono text-[1.55rem] leading-[1.7] tracking-[-0.02em] select-none sm:text-[2rem] sm:leading-[1.65]"
+                    style={{ wordBreak: "break-word" }}
+                  >
+                    {renderText()}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {status !== "finished" && (
+              <div className="flex min-h-8 flex-col items-center justify-between gap-3 text-xs text-[var(--muted)]/70 sm:flex-row">
+                <span>
+                  o cronômetro começa com a primeira tecla
+                </span>
+                <span className="flex items-center gap-2">
+                  <kbd className="rounded bg-[var(--surface)] px-2 py-1 text-[10px]">
+                    backspace
+                  </kbd>
+                  para corrigir
+                </span>
+              </div>
+            )}
+
+            <a
+              href="#ranking"
+              className="mx-auto mt-6 flex w-fit flex-col items-center gap-1 text-xs text-[var(--muted)] transition hover:text-[var(--foreground)]"
+            >
+              ver ranking
+              <ArrowDown size={14} />
+            </a>
+          </div>
+        </section>
+
+        <div className="mx-auto mt-14 max-w-5xl border-t border-[var(--border)] sm:mt-20">
+          <Leaderboard
+            scores={scores}
+            loading={scoresLoading}
+            currentNick={user?.nick}
+          />
+        </div>
+      </main>
+
+      <footer className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-8 text-xs text-[var(--muted)]/60 sm:px-6">
+        <span>typeflow</span>
+        <span>textos em português gerados por IA</span>
       </footer>
 
       <AuthModal

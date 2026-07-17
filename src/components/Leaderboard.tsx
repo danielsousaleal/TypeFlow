@@ -1,6 +1,7 @@
 "use client";
 
-import { Trophy } from "lucide-react";
+import { useState } from "react";
+import { Medal, Trophy } from "lucide-react";
 import type { ScoreRow } from "@/lib/types";
 
 type LeaderboardProps = {
@@ -23,86 +24,150 @@ export function Leaderboard({
   loading,
   currentNick,
 }: LeaderboardProps) {
+  const [filter, setFilter] = useState<"all" | "normal" | "sem_acentos">("all");
+  const filteredScores =
+    filter === "all" ? scores : scores.filter((score) => score.mode === filter);
+
   return (
-    <section className="w-full max-w-5xl rounded-2xl border border-[#5E503F] bg-[#22333B] p-6 shadow-2xl">
-      <div className="mb-6 flex items-center gap-3">
-        <div className="rounded-xl border border-[#5E503F] bg-[#323E40] p-3">
-          <Trophy size={22} className="text-[#A9927D]" />
+    <section id="ranking" className="w-full scroll-mt-24 py-10 sm:py-14">
+      <div className="mb-7 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+        <div className="flex items-center gap-3">
+          <div className="rounded-xl bg-[var(--accent)]/10 p-2.5 text-[var(--accent)]">
+            <Trophy size={20} />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight text-[var(--foreground)]">
+              Ranking
+            </h2>
+            <p className="mt-0.5 text-sm text-[var(--muted)]">
+              85% de precisão mínima · um resultado por modo
+            </p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-2xl font-bold text-[#A9927D]">Ranking</h2>
-          <p className="text-sm text-[#A9927D]/70">
-            Top 50 por PPM e precisão mínima de 85%. Cada pessoa aparece uma
-            vez por modalidade (troca: ~20 PPM ≈ 2% de precisão).
-          </p>
+
+        <div className="flex w-fit rounded-lg bg-[var(--surface)] p-1 text-xs font-medium">
+          {(
+            [
+              ["all", "Todos"],
+              ["normal", "Normal"],
+              ["sem_acentos", "Sem acentos"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setFilter(value)}
+              className={`rounded-md px-3 py-1.5 transition ${
+                filter === value
+                  ? "bg-[var(--surface-raised)] text-[var(--foreground)] shadow-sm"
+                  : "text-[var(--muted)] hover:text-[var(--foreground)]"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
       {loading ? (
-        <p className="py-8 text-center text-[#A9927D]/70">
-          Carregando placar...
-        </p>
-      ) : scores.length === 0 ? (
-        <p className="py-8 text-center text-[#A9927D]/70">
-          Ainda sem pontuações. Seja o primeiro no ranking!
-        </p>
+        <div className="space-y-2" aria-label="Carregando ranking">
+          {[0, 1, 2, 3, 4].map((item) => (
+            <div
+              key={item}
+              className="h-14 animate-pulse rounded-xl bg-[var(--surface)]"
+            />
+          ))}
+        </div>
+      ) : filteredScores.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-[var(--border)] py-14 text-center">
+          <Medal
+            size={28}
+            className="mx-auto mb-3 text-[var(--muted)]/60"
+          />
+          <p className="text-sm text-[var(--muted)]">
+            Nenhum resultado nessa modalidade ainda.
+          </p>
+        </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] border-separate border-spacing-y-2 text-left">
-            <thead>
-              <tr className="text-xs uppercase tracking-wider text-[#A9927D]/60">
-                <th className="px-3 py-2">#</th>
-                <th className="px-3 py-2">Nick</th>
-                <th className="px-3 py-2">PPM</th>
-                <th className="px-3 py-2">Precisão</th>
-                <th className="px-3 py-2">Modo</th>
-                <th className="px-3 py-2">Data</th>
-              </tr>
-            </thead>
-            <tbody>
-              {scores.map((score, index) => {
-                const isYou =
-                  currentNick &&
-                  score.nick.toLowerCase() === currentNick.toLowerCase();
+        <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+          <div className="hidden grid-cols-[3rem_1fr_6rem_6rem_10rem_5rem] border-b border-[var(--border)] px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)] sm:grid">
+            <span>#</span>
+            <span>Jogador</span>
+            <span>PPM</span>
+            <span>Precisão</span>
+            <span>Modalidade</span>
+            <span className="text-right">Data</span>
+          </div>
 
-                return (
-                  <tr
-                    key={score.id}
-                    className={`rounded-xl ${
-                      isYou
-                        ? "bg-[#A9927D]/15 outline outline-1 outline-[#A9927D]/40"
-                        : "bg-[#323E40]/70"
-                    }`}
-                  >
-                    <td className="rounded-l-xl px-3 py-3 font-mono text-[#A9927D]/80">
-                      {index + 1}
-                    </td>
-                    <td className="px-3 py-3 font-semibold text-[#A9927D]">
-                      {score.nick}
-                      {isYou ? (
-                        <span className="ml-2 text-xs font-normal opacity-70">
-                          (você)
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="px-3 py-3 font-bold text-[#A9927D]">
-                      {score.wpm}
-                    </td>
-                    <td className="px-3 py-3 text-[#A9927D]">{score.accuracy}%</td>
-                    <td className="px-3 py-3 text-sm text-[#A9927D]/80">
-                      {score.mode === "sem_acentos" ? "Sem acentos" : "Normal"} ·{" "}
-                      {score.length} · {score.difficulty}
-                    </td>
-                    <td className="rounded-r-xl px-3 py-3 text-sm text-[#A9927D]/70">
-                      {formatDate(score.created_at)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          {filteredScores.map((score, index) => {
+            const isYou =
+              currentNick &&
+              score.nick.toLowerCase() === currentNick.toLowerCase();
+
+            return (
+              <div
+                key={score.id}
+                className={`grid grid-cols-[2.5rem_1fr_auto] items-center gap-2 border-b border-[var(--border)] px-4 py-3.5 last:border-b-0 sm:grid-cols-[3rem_1fr_6rem_6rem_10rem_5rem] ${
+                  isYou ? "bg-[var(--accent)]/[0.06]" : ""
+                }`}
+              >
+                <span
+                  className={`font-mono text-sm ${
+                    index < 3
+                      ? "font-semibold text-[var(--accent)]"
+                      : "text-[var(--muted)]"
+                  }`}
+                >
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-[var(--foreground)]">
+                    {score.nick}
+                    {isYou && (
+                      <span className="ml-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">
+                        você
+                      </span>
+                    )}
+                  </p>
+                  <p className="mt-0.5 truncate text-xs text-[var(--muted)] sm:hidden">
+                    {score.mode === "sem_acentos" ? "Sem acentos" : "Normal"} ·{" "}
+                    {score.length}
+                  </p>
+                </div>
+
+                <div className="text-right sm:hidden">
+                  <p className="font-mono text-base font-semibold text-[var(--foreground)]">
+                    {score.wpm}
+                  </p>
+                  <p className="text-[10px] uppercase text-[var(--muted)] sm:hidden">
+                    {score.accuracy}% precisão
+                  </p>
+                </div>
+
+                <span className="hidden font-mono text-sm text-[var(--foreground)] sm:block">
+                  {score.wpm}
+                </span>
+                <span className="hidden font-mono text-sm text-[var(--muted)] sm:block">
+                  {score.accuracy}%
+                </span>
+                <span className="hidden text-xs text-[var(--muted)] sm:block">
+                  {score.mode === "sem_acentos" ? "Sem acentos" : "Normal"} ·{" "}
+                  {score.length}
+                </span>
+                <span className="hidden text-right text-xs text-[var(--muted)] sm:block">
+                  {formatDate(score.created_at)}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
+
+      <p className="mt-4 text-xs leading-relaxed text-[var(--muted)]/70">
+        Uma nova marca substitui a anterior quando seu saldo melhora. Na
+        comparação, 20 PPM equivalem a aproximadamente 2% de precisão.
+      </p>
     </section>
   );
 }
