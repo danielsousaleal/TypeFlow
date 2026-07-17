@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { ensureSchema, getDb } from "@/lib/db";
+import { MAX_ACCURACY_DROP } from "@/lib/score";
 import type {
   Difficulty,
   GameMode,
@@ -133,12 +134,13 @@ export async function POST(request: Request) {
           length = excluded.length,
           difficulty = excluded.difficulty,
           created_at = datetime('now')
-        WHERE (excluded.wpm + excluded.accuracy * 10)
-                >= (scores.wpm + scores.accuracy * 10)
-          AND (
-            excluded.wpm != scores.wpm
-            OR excluded.accuracy != scores.accuracy
-          )`,
+        WHERE (
+          excluded.wpm > scores.wpm
+          AND excluded.accuracy >= scores.accuracy - ${MAX_ACCURACY_DROP}
+        ) OR (
+          excluded.wpm = scores.wpm
+          AND excluded.accuracy > scores.accuracy
+        )`,
       args: [
         user.id,
         Math.round(wpm),

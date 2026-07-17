@@ -165,8 +165,8 @@ export function Leaderboard({
       )}
 
       <p className="mt-4 text-xs leading-relaxed text-[var(--muted)]/70">
-        Uma nova marca substitui a anterior quando seu saldo melhora. Na
-        comparação, 20 PPM equivalem a aproximadamente 2% de precisão.
+        Uma marca mais rápida pode substituir a anterior mesmo perdendo até 10
+        pontos de precisão. O mínimo para aparecer continua sendo 85%.
       </p>
     </section>
   );
