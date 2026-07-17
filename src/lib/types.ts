@@ -3,6 +3,7 @@ export type GameStatus = "idle" | "loading" | "ready" | "typing" | "finished";
 export type GameMode = "normal" | "sem_acentos";
 export type TextLength = "curto" | "médio" | "longo";
 export type Difficulty = "fáceis" | "dia a dia" | "difíceis";
+export type DeviceType = "desktop" | "mobile";
 
 export type User = {
   id: number;
@@ -19,6 +20,7 @@ export type ScoreRow = {
   mode: GameMode;
   length: TextLength;
   difficulty: Difficulty;
+  device: DeviceType;
   created_at: string;
 };
 
@@ -26,6 +28,7 @@ export type GeneratePayload = {
   mode: GameMode;
   length: TextLength;
   difficulty: Difficulty;
+  device: DeviceType;
 };
 
 export type SubmitScorePayload = {

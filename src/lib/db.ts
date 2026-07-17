@@ -9,6 +9,7 @@ type LegacyScore = {
   id: number;
   userId: number;
   mode: string;
+  device: string;
   wpm: number;
   accuracy: number;
 };
@@ -32,7 +33,7 @@ export function getDb() {
 
 async function migrateLegacyScores(db: Client) {
   const result = await db.execute(`
-    SELECT id, user_id, mode, wpm, accuracy
+    SELECT id, user_id, mode, device, wpm, accuracy
     FROM scores
     ORDER BY datetime(created_at) ASC, id ASC
   `);
@@ -41,6 +42,7 @@ async function migrateLegacyScores(db: Client) {
     id: Number(row.id),
     userId: Number(row.user_id),
     mode: String(row.mode),
+    device: String(row.device),
     wpm: Number(row.wpm),
     accuracy: Number(row.accuracy),
   }));
@@ -50,7 +52,7 @@ async function migrateLegacyScores(db: Client) {
   for (const score of scores) {
     if (score.accuracy < MIN_RANKING_ACCURACY) continue;
 
-    const key = `${score.userId}:${score.mode}`;
+    const key = `${score.userId}:${score.mode}:${score.device}`;
     const previous = winners.get(key);
 
     if (!previous || isBetterScore(score, previous)) {
@@ -74,10 +76,14 @@ async function migrateLegacyScores(db: Client) {
     );
   }
 
-  await db.execute(`
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_scores_user_mode
-    ON scores(user_id, mode)
-  `);
+  await db.batch(
+    [
+      "DROP INDEX IF EXISTS idx_scores_user_mode",
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_scores_user_mode_device
+       ON scores(user_id, mode, device)`,
+    ],
+    "write",
+  );
 }
 
 export async function ensureSchema() {
@@ -103,6 +109,7 @@ export async function ensureSchema() {
             mode TEXT NOT NULL,
             length TEXT NOT NULL,
             difficulty TEXT NOT NULL,
+            device TEXT NOT NULL DEFAULT 'desktop',
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
           )`,
           `CREATE INDEX IF NOT EXISTS idx_scores_wpm ON scores(wpm DESC)`,
@@ -111,8 +118,19 @@ export async function ensureSchema() {
         "write",
       );
 
+      const scoreColumns = await db.execute("PRAGMA table_info(scores)");
+      const hasDeviceColumn = scoreColumns.rows.some(
+        (column) => String(column.name) === "device",
+      );
+
+      if (!hasDeviceColumn) {
+        await db.execute(
+          "ALTER TABLE scores ADD COLUMN device TEXT NOT NULL DEFAULT 'desktop'",
+        );
+      }
+
       // Corrige dados de versões antigas e garante no máximo um resultado
-      // de cada usuário por modalidade.
+      // de cada usuário por modalidade e categoria de dispositivo.
       await migrateLegacyScores(db);
     })().catch((error) => {
       schemaReady = null;

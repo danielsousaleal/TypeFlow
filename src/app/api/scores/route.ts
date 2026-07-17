@@ -3,6 +3,7 @@ import { getSessionUser } from "@/lib/auth";
 import { ensureSchema, getDb } from "@/lib/db";
 import { MAX_ACCURACY_DROP } from "@/lib/score";
 import type {
+  DeviceType,
   Difficulty,
   GameMode,
   TextLength,
@@ -11,31 +12,45 @@ import type {
 const MODES: GameMode[] = ["normal", "sem_acentos"];
 const LENGTHS: TextLength[] = ["curto", "médio", "longo"];
 const DIFFICULTIES: Difficulty[] = ["fáceis", "dia a dia", "difíceis"];
+const DEVICES: DeviceType[] = ["desktop", "mobile"];
 const MIN_RANKING_ACCURACY = 85;
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const requestedDevice = new URL(request.url).searchParams.get("device");
+    const device = requestedDevice as DeviceType;
+
+    if (!DEVICES.includes(device)) {
+      return NextResponse.json(
+        { error: "Categoria de dispositivo inválida." },
+        { status: 400 },
+      );
+    }
+
     await ensureSchema();
     const db = getDb();
 
-    const result = await db.execute(`
-      SELECT
-        s.id,
-        u.nick,
-        s.wpm,
-        s.accuracy,
-        s.errors,
-        s.duration_ms,
-        s.mode,
-        s.length,
-        s.difficulty,
-        s.created_at
-      FROM scores s
-      INNER JOIN users u ON u.id = s.user_id
-      WHERE s.accuracy >= ${MIN_RANKING_ACCURACY}
-      ORDER BY s.wpm DESC, s.accuracy DESC, s.created_at ASC
-      LIMIT 50
-    `);
+    const result = await db.execute({
+      sql: `SELECT
+          s.id,
+          u.nick,
+          s.wpm,
+          s.accuracy,
+          s.errors,
+          s.duration_ms,
+          s.mode,
+          s.length,
+          s.difficulty,
+          s.device,
+          s.created_at
+        FROM scores s
+        INNER JOIN users u ON u.id = s.user_id
+        WHERE s.accuracy >= ?
+          AND s.device = ?
+        ORDER BY s.wpm DESC, s.accuracy DESC, s.created_at ASC
+        LIMIT 50`,
+      args: [MIN_RANKING_ACCURACY, device],
+    });
 
     const scores = result.rows.map((row) => ({
       id: Number(row.id),
@@ -47,6 +62,7 @@ export async function GET() {
       mode: String(row.mode) as GameMode,
       length: String(row.length) as TextLength,
       difficulty: String(row.difficulty) as Difficulty,
+      device: String(row.device) as DeviceType,
       created_at: String(row.created_at),
     }));
 
@@ -78,6 +94,7 @@ export async function POST(request: Request) {
       mode?: string;
       length?: string;
       difficulty?: string;
+      device?: string;
     };
 
     const wpm = Number(body.wpm);
@@ -87,6 +104,7 @@ export async function POST(request: Request) {
     const mode = body.mode as GameMode;
     const length = body.length as TextLength;
     const difficulty = body.difficulty as Difficulty;
+    const device = body.device as DeviceType;
 
     if (
       !Number.isFinite(wpm) ||
@@ -102,7 +120,8 @@ export async function POST(request: Request) {
       durationMs > 60 * 60 * 1000 ||
       !MODES.includes(mode) ||
       !LENGTHS.includes(length) ||
-      !DIFFICULTIES.includes(difficulty)
+      !DIFFICULTIES.includes(difficulty) ||
+      !DEVICES.includes(device)
     ) {
       return NextResponse.json(
         { error: "Pontuação inválida." },
@@ -124,9 +143,9 @@ export async function POST(request: Request) {
 
     const result = await db.execute({
       sql: `INSERT INTO scores
-        (user_id, wpm, accuracy, errors, duration_ms, mode, length, difficulty)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(user_id, mode) DO UPDATE SET
+        (user_id, wpm, accuracy, errors, duration_ms, mode, length, difficulty, device)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(user_id, mode, device) DO UPDATE SET
           wpm = excluded.wpm,
           accuracy = excluded.accuracy,
           errors = excluded.errors,
@@ -150,6 +169,7 @@ export async function POST(request: Request) {
         mode,
         length,
         difficulty,
+        device,
       ],
     });
 

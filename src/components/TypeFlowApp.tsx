@@ -24,7 +24,9 @@ import {
 } from "lucide-react";
 import { AuthModal } from "@/components/AuthModal";
 import { Leaderboard } from "@/components/Leaderboard";
+import { getPersistentDeviceType } from "@/lib/device";
 import type {
+  DeviceType,
   Difficulty,
   GameMode,
   GameStatus,
@@ -73,6 +75,7 @@ export default function TypeFlowApp() {
   const [savingScore, setSavingScore] = useState(false);
   const [pendingSaveAfterAuth, setPendingSaveAfterAuth] = useState(false);
   const [now, setNow] = useState(0);
+  const [deviceType, setDeviceType] = useState<DeviceType | null>(null);
 
   const typingAreaRef = useRef<HTMLDivElement>(null);
   const errorCountRef = useRef(0);
@@ -101,10 +104,12 @@ export default function TypeFlowApp() {
     };
   }, [wpm, accuracy, errorCount, startTime, endTime, mode, length, difficulty]);
 
-  const loadScores = useCallback(async () => {
+  const loadScores = useCallback(async (targetDevice: DeviceType) => {
     setScoresLoading(true);
     try {
-      const response = await fetch("/api/scores");
+      const response = await fetch(
+        `/api/scores?device=${encodeURIComponent(targetDevice)}`,
+      );
       const data = (await response.json()) as {
         scores?: ScoreRow[];
       };
@@ -165,7 +170,9 @@ export default function TypeFlowApp() {
       .catch(() => setUser(null));
 
     queueMicrotask(() => {
-      void loadScores();
+      const detectedDevice = getPersistentDeviceType();
+      setDeviceType(detectedDevice);
+      void loadScores(detectedDevice);
       void fetchText();
     });
     // Carga inicial apenas — mudanças de config pedem "Novo Teste"
@@ -257,7 +264,7 @@ export default function TypeFlowApp() {
 
   async function saveScoreForUser() {
     const stats = latestStatsRef.current;
-    if (!stats.startTime || !stats.endTime) return;
+    if (!stats.startTime || !stats.endTime || !deviceType) return;
 
     setSavingScore(true);
     setSaveMessage(null);
@@ -274,6 +281,7 @@ export default function TypeFlowApp() {
           mode: stats.mode,
           length: stats.length,
           difficulty: stats.difficulty,
+          device: deviceType,
         }),
       });
 
@@ -287,7 +295,7 @@ export default function TypeFlowApp() {
       }
 
       setSaveMessage(data.message ?? "Pontuação salva no ranking!");
-      await loadScores();
+      await loadScores(deviceType);
     } catch (error) {
       setSaveMessage(
         error instanceof Error ? error.message : "Erro ao salvar pontuação.",
@@ -685,6 +693,7 @@ export default function TypeFlowApp() {
             scores={scores}
             loading={scoresLoading}
             currentNick={user?.nick}
+            device={deviceType ?? "desktop"}
           />
         </div>
       </main>

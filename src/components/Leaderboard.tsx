@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Medal, Trophy } from "lucide-react";
-import type { ScoreRow } from "@/lib/types";
+import { Medal, Monitor, Smartphone, Trophy } from "lucide-react";
+import type { DeviceType, ScoreRow } from "@/lib/types";
 
 type LeaderboardProps = {
   scores: ScoreRow[];
   loading: boolean;
   currentNick?: string | null;
+  device: DeviceType;
 };
 
 function formatDate(value: string) {
@@ -23,6 +24,7 @@ export function Leaderboard({
   scores,
   loading,
   currentNick,
+  device,
 }: LeaderboardProps) {
   const [filter, setFilter] = useState<"all" | "normal" | "sem_acentos">("all");
   const filteredScores =
@@ -37,9 +39,14 @@ export function Leaderboard({
           </div>
           <div>
             <h2 className="text-xl font-semibold tracking-tight text-[var(--foreground)]">
-              Ranking
+              Ranking {device === "mobile" ? "mobile" : "desktop"}
             </h2>
-            <p className="mt-0.5 text-sm text-[var(--muted)]">
+            <p className="mt-0.5 flex items-center gap-1.5 text-sm text-[var(--muted)]">
+              {device === "mobile" ? (
+                <Smartphone size={13} />
+              ) : (
+                <Monitor size={13} />
+              )}
               85% de precisão mínima · um resultado por modo
             </p>
           </div>
