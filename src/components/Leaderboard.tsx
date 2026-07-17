@@ -32,7 +32,8 @@ export function Leaderboard({
         <div>
           <h2 className="text-2xl font-bold text-[#A9927D]">Ranking</h2>
           <p className="text-sm text-[#A9927D]/70">
-            Top 50 por PPM, com precisão mínima de 85%. Participação opcional.
+            Top 50 por PPM e precisão mínima de 85%. Cada pessoa aparece uma
+            vez por modalidade (troca: ~20 PPM ≈ 2% de precisão).
           </p>
         </div>
       </div>

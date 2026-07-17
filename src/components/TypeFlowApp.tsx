@@ -243,13 +243,16 @@ export default function TypeFlowApp() {
         }),
       });
 
-      const data = (await response.json()) as { error?: string };
+      const data = (await response.json()) as {
+        error?: string;
+        message?: string;
+      };
 
       if (!response.ok) {
         throw new Error(data.error ?? "Não foi possível salvar.");
       }
 
-      setSaveMessage("Pontuação salva no ranking!");
+      setSaveMessage(data.message ?? "Pontuação salva no ranking!");
       await loadScores();
     } catch (error) {
       setSaveMessage(

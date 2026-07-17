@@ -1,7 +1,17 @@
 import { createClient, type Client } from "@libsql/client";
+import { isBetterScore } from "@/lib/score";
 
 let client: Client | null = null;
 let schemaReady: Promise<void> | null = null;
+const MIN_RANKING_ACCURACY = 85;
+
+type LegacyScore = {
+  id: number;
+  userId: number;
+  mode: string;
+  wpm: number;
+  accuracy: number;
+};
 
 export function getDb() {
   const url = process.env.TURSO_DATABASE_URL;
@@ -18,6 +28,56 @@ export function getDb() {
   }
 
   return client;
+}
+
+async function migrateLegacyScores(db: Client) {
+  const result = await db.execute(`
+    SELECT id, user_id, mode, wpm, accuracy
+    FROM scores
+    ORDER BY datetime(created_at) ASC, id ASC
+  `);
+
+  const scores: LegacyScore[] = result.rows.map((row) => ({
+    id: Number(row.id),
+    userId: Number(row.user_id),
+    mode: String(row.mode),
+    wpm: Number(row.wpm),
+    accuracy: Number(row.accuracy),
+  }));
+
+  const winners = new Map<string, LegacyScore>();
+
+  for (const score of scores) {
+    if (score.accuracy < MIN_RANKING_ACCURACY) continue;
+
+    const key = `${score.userId}:${score.mode}`;
+    const previous = winners.get(key);
+
+    if (!previous || isBetterScore(score, previous)) {
+      winners.set(key, score);
+    }
+  }
+
+  const winnerIds = new Set([...winners.values()].map((score) => score.id));
+  const obsoleteIds = scores
+    .filter((score) => !winnerIds.has(score.id))
+    .map((score) => score.id);
+
+  for (let offset = 0; offset < obsoleteIds.length; offset += 100) {
+    const chunk = obsoleteIds.slice(offset, offset + 100);
+    await db.batch(
+      chunk.map((id) => ({
+        sql: "DELETE FROM scores WHERE id = ?",
+        args: [id],
+      })),
+      "write",
+    );
+  }
+
+  await db.execute(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_scores_user_mode
+    ON scores(user_id, mode)
+  `);
 }
 
 export async function ensureSchema() {
@@ -50,6 +110,10 @@ export async function ensureSchema() {
         ],
         "write",
       );
+
+      // Corrige dados de versões antigas e garante no máximo um resultado
+      // de cada usuário por modalidade.
+      await migrateLegacyScores(db);
     })().catch((error) => {
       schemaReady = null;
       throw error;

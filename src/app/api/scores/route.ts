@@ -121,10 +121,24 @@ export async function POST(request: Request) {
     await ensureSchema();
     const db = getDb();
 
-    await db.execute({
+    const result = await db.execute({
       sql: `INSERT INTO scores
         (user_id, wpm, accuracy, errors, duration_ms, mode, length, difficulty)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(user_id, mode) DO UPDATE SET
+          wpm = excluded.wpm,
+          accuracy = excluded.accuracy,
+          errors = excluded.errors,
+          duration_ms = excluded.duration_ms,
+          length = excluded.length,
+          difficulty = excluded.difficulty,
+          created_at = datetime('now')
+        WHERE (excluded.wpm + excluded.accuracy * 10)
+                >= (scores.wpm + scores.accuracy * 10)
+          AND (
+            excluded.wpm != scores.wpm
+            OR excluded.accuracy != scores.accuracy
+          )`,
       args: [
         user.id,
         Math.round(wpm),
@@ -137,7 +151,18 @@ export async function POST(request: Request) {
       ],
     });
 
-    return NextResponse.json({ ok: true }, { status: 201 });
+    const updated = result.rowsAffected > 0;
+
+    return NextResponse.json(
+      {
+        ok: true,
+        updated,
+        message: updated
+          ? "Pontuação salva no ranking!"
+          : "Sua melhor pontuação nessa modalidade continua no ranking.",
+      },
+      { status: updated ? 201 : 200 },
+    );
   } catch (error) {
     console.error(error);
     return NextResponse.json(
